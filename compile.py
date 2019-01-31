@@ -182,11 +182,11 @@ if __name__ == "__main__":
     folders = [os.path.join(content_directory, i)
                for i in os.listdir(content_directory)]
     folders.remove('pages/index.js')
+    res = None # to shutdown the linter about not def
     try:
         home_page, res = compile_directory(folders, os.path.join(
             build_directory, map_name), os.path.join(build_directory, map_home))
-        loader = build_loader(home_page, [i[6]
-                                          for i in res], map_name, map_home)
+        loader = build_loader(home_page, [i[6] for i in res], map_name, map_home)
         build_html(build_directory, loader)
     except Exception as e:
         print_error('[Error] :', e.__str__())
