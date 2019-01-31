@@ -74,9 +74,11 @@ def build_loader(home_page, folders, map_name, map_home):
         names, map_name)
 
     s += "const home_loader = new Fancy_router.Loader([home], '%s', { next_loader: l });\n" % map_home
+    
     names_l.insert(home_page[1], 'home')
     names = ','.join(names_l)
     s += 'home_loader.load();'
+    
     s += "const r = new Fancy_router.Renderer(document.getElementById('main_container'), [{}], {});".format(
         names, '{home_value : %s }' % home_page[1])
 
