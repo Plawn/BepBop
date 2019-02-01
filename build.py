@@ -21,6 +21,8 @@ re_classes = re.compile(r"\.-?[_a-zA-Z]+[_a-zA-Z0-9-]*\s*\{")
 re_ids = re.compile(r"\#[a-zA-Z][a-zA-Z0-9\-\_]+")
 re_find_comments = re.compile(r"\/\*[^*]*\*+([^/*][^*]*\*+)*\/")
 
+re_js_exporter = re.compile(r"(?s)(?<=export default ).*?(?=])")
+
 begin = """(function (){
             const home = new Fancy_router.Panel(null, { name: '%s' });\n"""
 end = """r.render();\n})();"""
@@ -38,6 +40,41 @@ js_init = 'init.js'
 # presets
 
 
+def check_export_string(i: str):
+    i = i.strip()
+    if i[0] == '[':
+        i = i[1:]
+    if i[-1] == ']':
+        i = i[:-1]
+    return i
+
+def do_one(res):
+    s = ''
+    for i in [check_export_string(i) for i in res.split(',')]:
+        s += 'window.{} = {};\n'.format(i, i)
+    return s[:-2]
+
+def build_export_string(string):
+    res = re_js_exporter.findall(string)
+    string = string.replace('export default', '')
+    if len(res) > 0:
+        res[0] += ']'
+        s = ''
+        for i in res :
+            string = string.replace(i, '')
+            s += do_one(i) + ';\n'
+
+        return string + s
+    else:
+        return ''
+
+def build_js(js:str):
+    x = build_export_string(js)
+    print(x)
+    return x
+    
+
+
 def read_if_exists(filename):
     if os.path.exists(filename):
         with open(filename, 'r') as f:
@@ -48,13 +85,10 @@ def read_if_exists(filename):
 
 def do_one_page(folder_name):
 
-    # with open(os.path.join(folder_name, html_name)) as f:
-    #     html = f.read()
     html = read_if_exists(os.path.join(folder_name, html_name))
     onload_js = read_if_exists(os.path.join(folder_name, onload_name))
+
     init_js = read_if_exists(os.path.join(folder_name, js_init))
-    # with open(os.path.join(folder_name, onload_name)) as f:
-    #     js = f.read()
 
     is_home = False
     with open(os.path.join(folder_name, settings_name), 'r') as f:
@@ -78,6 +112,9 @@ def do_one_page(folder_name):
     if os.path.exists(filename):
         with open(filename, 'r') as f:
             js_content = f.read()
+
+    if not is_home :
+        init_js = build_js(init_js)
 
     return {'content': html, 'onload': onload_js, 'init': init_js}, order, is_home, css, js_content, folder_name.split('/')[-1], folder_name
 
@@ -112,10 +149,10 @@ def build_loader(home_page, folders, map_name, map_home):
 def css_checker(classes, ids, new_classes, new_ids):
     dupes_classes, dupes_ids = [], []
     for item in new_classes:
-        if item in classes :
+        if item in classes:
             dupes_classes.append(item)
     for item in new_ids:
-        if item in ids :
+        if item in ids:
             dupes_ids.append(item)
     return dupes_classes, dupes_ids
 
@@ -135,7 +172,8 @@ def handle_css(folders, output, fold):
         new_ids = get_ids(item)
         new_classes = get_classes(item)
 
-        dupes_classes, dupes_ids = css_checker(classes,ids, new_classes, new_ids)
+        dupes_classes, dupes_ids = css_checker(
+            classes, ids, new_classes, new_ids)
         if len(dupes_classes) > 0:
             raise Exception(
                 'In "{}" | [CSS ERROR] class duplicate -> {}'.format(folde.split('/')[-1], dupes_classes))
@@ -155,13 +193,18 @@ def handle_js(folders, output, fold):
     js = ''
     # variables = []
     for item in filter(lambda x: x[4] != None, folders):
-        js += item[4] + '\n'
+        # js += item[4] + build_export_string(item[4])
+        js += build_js(item[4])
     return js
 
 # add support for the first page
 
 
 def build_home_map(page, filename):
+    if page[4] != None:
+        page[0]['init'] += page[4]
+    page[0]['init'] = '(()=>{' + page[0]['init'] + \
+        build_export_string(page[0]['init']) + '})();'
     with open(filename, 'w') as f:
         json.dump({page[5]: page[0]}, f, indent=4)
 
@@ -198,10 +241,23 @@ def init_build_directory():
     shutil.copy('pages/index.js', 'build/')
 
 
+string_import_replace = '<!-- |imports here| -->'
+base_import_html = '<script src="{}"></script>'
+
+
+def build_imports(imports):
+    return '\n'.join([base_import_html.format(i) for i in imports])
+
+
 def build_html(build_path, js):
     with open('build_tools/index.html', 'r') as f:
         content = f.read()
+    with open('config.json', 'r') as f:
+        t = json.load(f)
+    imports = t['import']
     content = content.replace(loader_replace, js)
+    content = content.replace(string_import_replace, build_imports(imports))
+
     with open(os.path.join(build_path, 'index.html'), 'w') as f:
         f.write(content)
 

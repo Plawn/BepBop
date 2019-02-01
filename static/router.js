@@ -4,6 +4,7 @@ const Fancy_router = (function () {
     'use strict';
 
     const sort_by_key = key => (a, b) => (a[key] > b[key]) ? 1 : ((b[key] > a[key]) ? -1 : 0);
+    const is_func = v => typeof v === 'function'
 
     const make_link = (renderer, panel, className = '') => {
         const b = document.createElement('input');
@@ -33,12 +34,14 @@ const Fancy_router = (function () {
                 .then(data => data.json())
                 // .then(data => {console.log(data); return data;})
                 .then(data => {
+                    eval(data.js || '');
                     this.panels.forEach(e => {
+                        console.log(e.name);
                         e.set_content(data[e.name].content || '');
-                        e.onload = eval(data[e.name].onload || '');
-                        e.init(data[e.name].init_js || '');
+                        const t = eval(data[e.name].onload || '');
+                        e.onload = is_func(t) ? t : (() => { })
+                        e.init(data[e.name].init || '');
                     });
-                    eval(data.js);
                 })
                 .then(() => {
                     if (this.next_loader !== null) this.next_loader.load();
@@ -71,7 +74,7 @@ const Fancy_router = (function () {
         hide() { this.div.hidden = true; }
         show() { this.div.hidden = false; }
 
-        init(init_content){
+        init(init_content) {
             this.init_js = init_content;
             eval(init_content);
         }

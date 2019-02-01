@@ -1,3 +1,6 @@
 {
-    "last_page": 5
+    "last_page": 5,
+    "import": [
+        "/static/webSocketedCon.js"
+    ]
 }
