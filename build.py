@@ -53,8 +53,8 @@ def do_one(res):
     for i in [check_export_string(i) for i in res.split(',')]:
         s += 'window.{} = {};\n'.format(i, i)
     return s[:-2]
-
-def build_export_string(string):
+    
+def build_js(string:str):
     res = re_js_exporter.findall(string)
     string = string.replace('export default', '')
     if len(res) > 0:
@@ -63,15 +63,8 @@ def build_export_string(string):
         for i in res :
             string = string.replace(i, '')
             s += do_one(i) + ';\n'
-
         return string + s
-    else:
-        return ''
-
-def build_js(js:str):
-    x = build_export_string(js)
-    print(x)
-    return x
+    return string
     
 
 
@@ -87,7 +80,7 @@ def do_one_page(folder_name):
 
     html = read_if_exists(os.path.join(folder_name, html_name))
     onload_js = read_if_exists(os.path.join(folder_name, onload_name))
-
+    # onload_js = build_js(onload_js)
     init_js = read_if_exists(os.path.join(folder_name, js_init))
 
     is_home = False
@@ -203,8 +196,7 @@ def handle_js(folders, output, fold):
 def build_home_map(page, filename):
     if page[4] != None:
         page[0]['init'] += page[4]
-    page[0]['init'] = '(()=>{' + page[0]['init'] + \
-        build_export_string(page[0]['init']) + '})();'
+    page[0]['init'] = build_js(page[0]['init'])
     with open(filename, 'w') as f:
         json.dump({page[5]: page[0]}, f, indent=4)
 
@@ -274,7 +266,7 @@ def main(folderss=[], prefix=''):
 
     build_directory = 'build'
     map_name = 'map.json'
-    js_name = 'index.js'
+    # js_name = 'index.js'
     map_home = 'home_map.json'
 
     init_build_directory()
