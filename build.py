@@ -3,6 +3,8 @@ import json
 import shutil
 import re
 import Fancy_term as term
+import helper
+import time
 # add watcher for auto recompile
 
 print_error = term.Smart_print(style=term.Style(
@@ -12,13 +14,19 @@ print_success = term.Smart_print(style=term.Style(
 
 
 loader_replace = '//put the loader here//'
+
+
 # regex
 re_classes = re.compile(r"\.-?[_a-zA-Z]+[_a-zA-Z0-9-]*\s*\{")
-re_ids = re.compile(r"\#[a-z]+[0-9]*")
+re_ids = re.compile(r"\#[a-zA-Z][a-zA-Z0-9\-\_]+")
+re_find_comments = re.compile(r"\/\*[^*]*\*+([^/*][^*]*\*+)*\/")
 
 begin = """(function (){
             const home = new Fancy_router.Panel(null, { name: '%s' });\n"""
 end = """r.render();\n})();"""
+
+content_directory = 'pages'
+
 
 # filenames
 html_name = 'page.html'
@@ -26,17 +34,27 @@ css_name = 'page.css'
 settings_name = 'settings.json'
 onload_name = 'onload.js'
 js_name = 'page.js'
-
+js_init = 'init.js'
 # presets
+
+
+def read_if_exists(filename):
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            data = f.read()
+            return data
+    return ''
 
 
 def do_one_page(folder_name):
 
-    with open(os.path.join(folder_name, html_name)) as f:
-        html = f.read()
-
-    with open(os.path.join(folder_name, onload_name)) as f:
-        js = f.read()
+    # with open(os.path.join(folder_name, html_name)) as f:
+    #     html = f.read()
+    html = read_if_exists(os.path.join(folder_name, html_name))
+    onload_js = read_if_exists(os.path.join(folder_name, onload_name))
+    init_js = read_if_exists(os.path.join(folder_name, js_init))
+    # with open(os.path.join(folder_name, onload_name)) as f:
+    #     js = f.read()
 
     is_home = False
     with open(os.path.join(folder_name, settings_name), 'r') as f:
@@ -51,6 +69,8 @@ def do_one_page(folder_name):
     if os.path.exists(filename):
         with open(filename, 'r') as f:
             css = f.read()
+        for item in re_find_comments.findall(css):
+            css = css.replace(item, '')
 
     # handling js here
     filename = os.path.join(folder_name, js_name)
@@ -58,12 +78,13 @@ def do_one_page(folder_name):
     if os.path.exists(filename):
         with open(filename, 'r') as f:
             js_content = f.read()
-    return {'content': html, 'onload': js}, order, is_home, css, js_content, folder_name.split('/')[-1], folder_name
+
+    return {'content': html, 'onload': onload_js, 'init': init_js}, order, is_home, css, js_content, folder_name.split('/')[-1], folder_name
 
 
 def build_loader(home_page, folders, map_name, map_home):
     s = begin % home_page[5]
-    names_l = ['p'+str(i) for i in range(len(folders))]
+    names_l = ['p{}'.format(i) for i in range(len(folders))]
     names = ','.join(names_l)
     for i, folder in enumerate(folders):
         s += "const %s = " % ('p'+str(i)) + \
@@ -74,11 +95,11 @@ def build_loader(home_page, folders, map_name, map_home):
         names, map_name)
 
     s += "const home_loader = new Fancy_router.Loader([home], '%s', { next_loader: l });\n" % map_home
-    
+
     names_l.insert(home_page[1], 'home')
     names = ','.join(names_l)
     s += 'home_loader.load();'
-    
+
     s += "const r = new Fancy_router.Renderer(document.getElementById('main_container'), [{}], {});".format(
         names, '{home_value : %s }' % home_page[1])
 
@@ -88,11 +109,15 @@ def build_loader(home_page, folders, map_name, map_home):
 # css building
 
 
-def css_checker(classes, ids):
-    if len(classes) == len(set(classes)):
-        if len(ids) == len(set(ids)):
-            return True
-    return False
+def css_checker(classes, ids, new_classes, new_ids):
+    dupes_classes, dupes_ids = [], []
+    for item in new_classes:
+        if item in classes :
+            dupes_classes.append(item)
+    for item in new_ids:
+        if item in ids :
+            dupes_ids.append(item)
+    return dupes_classes, dupes_ids
 
 
 def get_classes(css):
@@ -105,15 +130,22 @@ def get_ids(css):
 
 def handle_css(folders, output, fold):
     css, ids, classes = '', [], []
-
+    #  fix sort to have the correct name
     for item, folde in zip(filter(lambda x: x != None, map(lambda x: x[3], folders)), fold):
-        ids += get_ids(item)
-        classes += get_classes(item)
-        if css_checker(ids, classes):
-            css += item
-        else:
+        new_ids = get_ids(item)
+        new_classes = get_classes(item)
+
+        dupes_classes, dupes_ids = css_checker(classes,ids, new_classes, new_ids)
+        if len(dupes_classes) > 0:
             raise Exception(
-                'classe or id duplicate trying to add : "{}" page'.format(folde.split('/')[-1]))
+                'In "{}" | [CSS ERROR] class duplicate -> {}'.format(folde.split('/')[-1], dupes_classes))
+        elif len(dupes_ids) > 0:
+            raise Exception(
+                'In "{}" | [CSS ERROR] id duplicate -> {}'.format(folde.split('/')[-1], dupes_ids))
+        else:
+            css += item
+            ids += new_ids
+            classes += new_classes
     with open(os.path.join(os.path.dirname(output), 'index.css'), 'w') as f:
         f.write(css)
 
@@ -136,17 +168,19 @@ def build_home_map(page, filename):
 
 def compile_directory(folders, output, output_home):
     res = [do_one_page(folder) for folder in folders]
-    res.sort(key=lambda x: x[1])
+    res.sort(key=lambda x: x[1])  # sorting by order
+
     # handling home page
     try:
         home_page = list(filter(lambda x: x[2], res))[0]
     except:
         raise Exception('No homepage set')
-    # fold.remove(home_page[6])
+
     build_home_map(home_page, output_home)
     # css handling
     handle_css(res, output, folders)  # css of homepage with the rest for now
     res.remove(home_page)
+
     js = handle_js(res, output, folders)
     d = {i[5]: i[0] for i in res}
     d['js'] = js
@@ -172,27 +206,45 @@ def build_html(build_path, js):
         f.write(content)
 
 
-if __name__ == "__main__":
-    # content_directory = sys.argv[1]
-    content_directory = 'pages'
+def main(folderss=[], prefix=''):
+
+    start_time = time.time()
+
+    if folderss == []:
+        folders = [os.path.join(content_directory, i)
+                   for i in os.listdir(content_directory)]
+    else:
+        folders = [*folderss]
+
     build_directory = 'build'
     map_name = 'map.json'
     js_name = 'index.js'
     map_home = 'home_map.json'
 
     init_build_directory()
-    folders = [os.path.join(content_directory, i)
-               for i in os.listdir(content_directory)]
-    folders.remove('pages/index.js')
-    res = None # to shutdown the linter about not def
+
+    helper.try_rm_list(folders, 'pages/index.js')
+    helper.try_rm_list(folders, 'pages/.DS_Store')
+
+    map_filename = os.path.join(build_directory, map_name)
+    map_home_name = os.path.join(build_directory, map_home)
+
     try:
-        home_page, res = compile_directory(folders, os.path.join(
-            build_directory, map_name), os.path.join(build_directory, map_home))
-        loader = build_loader(home_page, [i[6] for i in res], map_name, map_home)
+        home_page, res = compile_directory(
+            folders, map_filename, map_home_name)
+        folders = [i[6] for i in res]
+        loader = build_loader(home_page, folders, map_name, map_home)
         build_html(build_directory, loader)
     except Exception as e:
-        print_error('[Error] :', e.__str__())
+        end_time = time.time()
+        print_error(prefix, ' [Error] :', e.__str__())
     else:
-        print_success('Success')
+        end_time = time.time()
+        print_success(prefix, ' Successful build | %0.2f s' %
+                      (end_time-start_time))
 
 
+if __name__ == "__main__":
+    folders = [os.path.join(content_directory, i)
+               for i in os.listdir(content_directory)]
+    main(folders)

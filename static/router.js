@@ -34,9 +34,10 @@ const Fancy_router = (function () {
                 // .then(data => {console.log(data); return data;})
                 .then(data => {
                     this.panels.forEach(e => {
-                        e.set_content(data[e.name].content);
-                        e.onload = eval(data[e.name].onload);
-                    })
+                        e.set_content(data[e.name].content || '');
+                        e.onload = eval(data[e.name].onload || '');
+                        e.init(data[e.name].init_js || '');
+                    });
                     eval(data.js);
                 })
                 .then(() => {
@@ -53,7 +54,7 @@ const Fancy_router = (function () {
             this.name = settings.name || 'undefined';
             this.onload = settings.onload || (() => { });
             this.div = document.createElement('div');
-
+            this.init_js = settings.init_js || '';
             this.loader = null;
             this.ready = false;
         }
@@ -69,6 +70,11 @@ const Fancy_router = (function () {
 
         hide() { this.div.hidden = true; }
         show() { this.div.hidden = false; }
+
+        init(init_content){
+            this.init_js = init_content;
+            eval(init_content);
+        }
 
         set_content(content) {
             this.div.innerHTML = content;
