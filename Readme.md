@@ -1,8 +1,12 @@
-# how to work
+# How to work
 
+
+Directory Schema
+---
 ```
 .
 +-- pages
+|   +-- index.js
 |   +-- page1
 |       +-- page.html
 |       +-- settings.json
@@ -26,6 +30,7 @@
 +-- index.css
 +-- index.js
 +-- map.json
++-- home_map.json
 
 
 
