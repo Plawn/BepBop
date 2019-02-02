@@ -111,5 +111,5 @@ python BepBop.py new page_name
 The generation of the project directory is not supported yet => just
 
 ```shell
-mdkir pages
+$ mdkir pages
 ```
