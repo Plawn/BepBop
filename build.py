@@ -191,7 +191,6 @@ def handle_js(folders, output, fold):
         js += build_js(item[4])
     return js
 
-# add support for the first page
 
 
 def build_home_map(page, filename):
@@ -208,7 +207,7 @@ def compile_directory(folders, output, output_home):
 
     # handling home page
     try:
-        home_page = list(filter(lambda x: x[2], res))[0]
+        home_page:tuple = list(filter(lambda x: x[2], res))[0]
     except:
         raise Exception('No homepage set')
 
