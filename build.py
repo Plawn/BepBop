@@ -158,10 +158,10 @@ def get_ids(css):
     return list(map(lambda x: x[1:], re_ids.findall(css)))
 
 
-def handle_css(folders, output, fold):
+def handle_css(folders, output):
     css, ids, classes = '', [], []
-    #  fix sort to have the correct name
-    for item, folde in zip(filter(lambda x: x != None, map(lambda x: x[3], folders)), fold):
+
+    for item, folde in zip(filter(lambda x: x != None, map(lambda x: x[3], folders)), folders):
         new_ids = get_ids(item)
         new_classes = get_classes(item)
 
@@ -169,14 +169,15 @@ def handle_css(folders, output, fold):
             classes, ids, new_classes, new_ids)
         if len(dupes_classes) > 0:
             raise Exception(
-                'In "{}" | [CSS ERROR] class duplicate -> {}'.format(folde.split('/')[-1], dupes_classes))
+                'In "{}" | [CSS ERROR] class duplicate -> {}'.format(folde[5], dupes_classes))
         elif len(dupes_ids) > 0:
             raise Exception(
-                'In "{}" | [CSS ERROR] id duplicate -> {}'.format(folde.split('/')[-1], dupes_ids))
+                'In "{}" | [CSS ERROR] id duplicate -> {}'.format(folde[5], dupes_ids))
         else:
             css += item
             ids += new_ids
             classes += new_classes
+    
     with open(os.path.join(os.path.dirname(output), 'index.css'), 'w') as f:
         f.write(css)
 
@@ -213,7 +214,7 @@ def compile_directory(folders, output, output_home):
 
     build_home_map(home_page, output_home)
     # css handling
-    handle_css(res, output, folders)  # css of homepage with the rest for now
+    handle_css(res, output)  # css of homepage with the rest for now
     res.remove(home_page)
 
     js = handle_js(res, output, folders)
