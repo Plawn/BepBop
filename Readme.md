@@ -127,7 +127,6 @@ $ mdkir pages
 
 
 ## To do
----
 
 * add minify on build
 * better javascript checking
