@@ -39,7 +39,9 @@ const Fancy_router = (function () {
                         console.log(e.name);
                         e.set_content(data[e.name].content || '');
                         const t = eval(data[e.name].onload || '');
-                        e.onload = is_func(t) ? t : (() => { })
+                        e.onload = is_func(t) ? t : (() => { });
+                        const t2 = eval(data[e.name].onquit || '');
+                        e.onquit = is_func(t2) ? t2 : (() => { });
                         e.init(data[e.name].init || '');
                     });
                 })
@@ -143,7 +145,7 @@ const Fancy_router = (function () {
             this.render_div = render_div;
             this.sub_page = null;
             this.menu = new Menu(panels, this);
-            this.diplayed = 0;
+            this.displayed = 0;
             this.title_auto_change = settings.title_auto_change || true;
             this.state = {};
         }
@@ -152,8 +154,9 @@ const Fancy_router = (function () {
             if (this.diplayed == panel) return;
             if (this.title_auto_change) document.title = panel.name;
             window.history.pushState('', '', '?path=' + panel.name);
-            this.diplayed.hide();
-            this.diplayed = panel;
+            this.displayed.hide();
+            this.displayed.onquit(this);
+            this.displayed = panel;
             panel.show();
             panel.onload(this);
         }
@@ -165,7 +168,7 @@ const Fancy_router = (function () {
         first_load() {
             if (this.title_auto_change) document.title = this.panels[this.home_value].name;
             window.history.pushState('', '', '?path=' + this.panels[this.home_value].name);
-            this.diplayed = this.panels[this.home_value];
+            this.displayed = this.panels[this.home_value];
             this.panels[this.home_value].show();
             this.panels[this.home_value].onload(this);
         }

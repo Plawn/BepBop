@@ -37,6 +37,8 @@ settings_name = 'settings.json'
 onload_name = 'onload.js'
 js_name = 'page.js'
 js_init = 'init.js'
+js_quit = 'onquit.js'
+
 # presets
 
 
@@ -81,7 +83,7 @@ def do_one_page(folder_name):
 
     html = read_if_exists(os.path.join(folder_name, html_name))
     onload_js = read_if_exists(os.path.join(folder_name, onload_name))
-    # onload_js = build_js(onload_js)
+    onquit_js = read_if_exists(os.path.join(folder_name, js_quit))
     init_js = read_if_exists(os.path.join(folder_name, js_init))
 
     is_home = False
@@ -110,7 +112,7 @@ def do_one_page(folder_name):
     if not is_home:
         init_js = build_js(init_js)
 
-    return {'content': html, 'onload': onload_js, 'init': init_js}, order, is_home, css, js_content, folder_name.split('/')[-1], folder_name
+    return {'content': html, 'onload': onload_js, 'init': init_js, 'onquit': onquit_js}, order, is_home, css, js_content, folder_name.split('/')[-1], folder_name
 
 
 def build_loader(home_page, folders, map_name, map_home):
