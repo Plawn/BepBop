@@ -50,7 +50,11 @@ JSON object containing at least two keys :
 
 #### onload.js
 
-Should contain one function that will be called everytime the user goes the page
+Should contain one function that will be called everytime the user loads the page
+
+#### onquit.js
+
+Should contain one function that will be called everytime the user lives the page
 
 #### init.js
 

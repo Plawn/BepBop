@@ -48,24 +48,25 @@ def check_export_string(i: str):
         i = i[:-1]
     return i
 
+
 def do_one(res):
     s = ''
     for i in [check_export_string(i) for i in res.split(',')]:
         s += 'window.{} = {};\n'.format(i, i)
     return s[:-2]
-    
-def build_js(string:str):
+
+
+def build_js(string: str):
     res = re_js_exporter.findall(string)
     string = string.replace('export default', '')
     if len(res) > 0:
         res[0] += ']'
         s = ''
-        for i in res :
+        for i in res:
             string = string.replace(i, '')
             s += do_one(i) + ';\n'
         return string + s
     return string
-    
 
 
 def read_if_exists(filename):
@@ -106,7 +107,7 @@ def do_one_page(folder_name):
         with open(filename, 'r') as f:
             js_content = f.read()
 
-    if not is_home :
+    if not is_home:
         init_js = build_js(init_js)
 
     return {'content': html, 'onload': onload_js, 'init': init_js}, order, is_home, css, js_content, folder_name.split('/')[-1], folder_name
@@ -177,7 +178,7 @@ def handle_css(folders, output):
             css += item
             ids += new_ids
             classes += new_classes
-    
+
     with open(os.path.join(os.path.dirname(output), 'index.css'), 'w') as f:
         f.write(css)
 
@@ -192,13 +193,13 @@ def handle_js(folders, output, fold):
     return js
 
 
-
 def build_home_map(page, filename):
-    if page[4] != None:
-        page[0]['init'] += page[4]
     page[0]['init'] = build_js(page[0]['init'])
+    d = {page[5]: page[0]}
+    if page[4] != None:
+        d['js'] = build_js(page[4])
     with open(filename, 'w') as f:
-        json.dump({page[5]: page[0]}, f, indent=4)
+        json.dump(d, f, indent=4)
 
 
 def compile_directory(folders, output, output_home):
@@ -207,7 +208,7 @@ def compile_directory(folders, output, output_home):
 
     # handling home page
     try:
-        home_page:tuple = list(filter(lambda x: x[2], res))[0]
+        home_page: tuple = list(filter(lambda x: x[2], res))[0]
     except:
         raise Exception('No homepage set')
 
