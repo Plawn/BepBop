@@ -134,3 +134,4 @@ $ mdkir pages
 
 * add minify on build
 * better javascript checking
+* add include at compile time

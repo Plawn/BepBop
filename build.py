@@ -5,15 +5,14 @@ import re
 import Fancy_term as term
 import helper
 import time
-# add watcher for auto recompile
-
-print_error = term.Smart_print(style=term.Style(
-    color=term.colors.red, substyle="bold"))
-print_success = term.Smart_print(style=term.Style(
-    color=term.colors.green, substyle="bold"))
-
 
 loader_replace = '//put the loader here//'
+
+
+print_error = term.Smart_print(style=term.Style(
+    color=term.colors.red, substyle=[term.substyles.bold]))
+print_success = term.Smart_print(style=term.Style(
+    color=term.colors.green, substyle=[term.substyles.bold]))
 
 
 # regex
@@ -51,14 +50,46 @@ def check_export_string(i: str):
     return i
 
 
-def do_one(res):
+def make_filename(name: str, importer_name: str):
+    name = name[1:-1]
+    if name[0] == '/':
+        return name
+    folder = '/'.join(importer_name.split('/')[:-1])
+    if len(folder) == 0:
+        folder = './'
+    name = os.path.join(folder, name).replace('././', './')
+    while name[0] == '"' or name[0] == "'":
+        name = name[1:]
+    return name
+
+
+re_import = re.compile(r"(?s)(?<=import ).*?(?=;)")
+
+
+def importer(res: str, importer_name: str):
+    for filename in filter(lambda x: x !=
+                           '', re_import.findall(res)):
+        try:
+            # handle recursve imports
+            # filename =
+            print(make_filename(filename, importer_name))
+            with open(make_filename(filename, importer_name), 'r') as f:
+                res = res.replace('import ' + filename + ';',
+                                  importer(f.read(), filename))
+        except:
+            raise Exception("couldn't find file {}".format(filename))
+    return res
+
+
+def handle_export_js(res):
     s = ''
-    for i in [check_export_string(i) for i in res.split(',')]:
+    for i in map(lambda i: check_export_string(i), res.split(',')):
         s += 'window.{} = {};\n'.format(i, i)
     return s[:-2]
 
 
-def build_js(string: str):
+def build_js(string: str, filename: str):
+    string = importer(string, filename)
     res = re_js_exporter.findall(string)
     string = string.replace('export default', '')
     if len(res) > 0:
@@ -66,7 +97,7 @@ def build_js(string: str):
         s = ''
         for i in res:
             string = string.replace(i, '')
-            s += do_one(i) + ';\n'
+            s += handle_export_js(i) + ';\n'
         return string + s
     return string
 
@@ -110,7 +141,7 @@ def do_one_page(folder_name):
             js_content = f.read()
 
     if not is_home:
-        init_js = build_js(init_js)
+        init_js = build_js(init_js, filename)
 
     return {'content': html, 'onload': onload_js, 'init': init_js, 'onquit': onquit_js}, order, is_home, css, js_content, folder_name.split('/')[-1], folder_name
 
@@ -191,15 +222,15 @@ def handle_js(folders, output, fold):
     # variables = []
     for item in filter(lambda x: x[4] != None, folders):
         # js += item[4] + build_export_string(item[4])
-        js += build_js(item[4])
+        js += build_js(item[4], os.path.join(item[6], js_name))
     return js
 
 
 def build_home_map(page, filename):
-    page[0]['init'] = build_js(page[0]['init'])
+    page[0]['init'] = build_js(page[0]['init'], os.path.join(page[6], js_name))
     d = {page[5]: page[0]}
     if page[4] != None:
-        d['js'] = build_js(page[4])
+        d['js'] = build_js(page[4], os.path.join(page[6], js_name))
     with open(filename, 'w') as f:
         json.dump(d, f, indent=4)
 
