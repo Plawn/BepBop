@@ -14,6 +14,8 @@ print_error = term.Smart_print(style=term.Style(
 print_success = term.Smart_print(style=term.Style(
     color=term.colors.green, substyle=[term.substyles.bold]))
 
+print_warn = term.Smart_print(style=term.Style(
+    color=term.colors.yellow, substyle=[term.substyles.bold]))
 
 # regex
 re_classes = re.compile(r"\.-?[_a-zA-Z]+[_a-zA-Z0-9-]*\s*\{")
@@ -37,7 +39,10 @@ onload_name = 'onload.js'
 js_name = 'page.js'
 js_init = 'init.js'
 js_quit = 'onquit.js'
-
+build_directory = 'build/assets'
+map_name = 'map.json'
+# js_name = 'index.js'
+map_home = 'home_map.json'
 # presets
 
 
@@ -102,15 +107,16 @@ def build_js(string: str, filename: str):
     return string
 
 
-def read_if_exists(filename):
-    if os.path.exists(filename):
+def read_if_exists(filename: str):
+    try:
         with open(filename, 'r') as f:
             data = f.read()
             return data
-    return ''
+    except:
+        return ''
 
 
-def do_one_page(folder_name):
+def do_one_page(folder_name: str):
 
     html = read_if_exists(os.path.join(folder_name, html_name))
     onload_js = read_if_exists(os.path.join(folder_name, onload_name))
@@ -150,6 +156,7 @@ def build_loader(home_page, folders, map_name, map_home):
     s = begin % home_page[5]
     names_l = ['p{}'.format(i) for i in range(len(folders))]
     names = ','.join(names_l)
+    # based on the Fancy_router JS framework
     for i, folder in enumerate(folders):
         s += "const %s = " % ('p'+str(i)) + \
             "new Fancy_router.Panel(null, { name: '%s' });\n" % folder.split(
@@ -173,7 +180,7 @@ def build_loader(home_page, folders, map_name, map_home):
 # css building
 
 
-def css_checker(classes, ids, new_classes, new_ids):
+def css_checker(classes: list, ids: list, new_classes: list, new_ids: list):
     dupes_classes, dupes_ids = [], []
     for item in new_classes:
         if item in classes:
@@ -184,16 +191,17 @@ def css_checker(classes, ids, new_classes, new_ids):
     return dupes_classes, dupes_ids
 
 
-def get_classes(css):
+def get_classes(css: str):
     return list(map(lambda x: x[1:-1],  re_classes.findall(css)))
 
 
-def get_ids(css):
+def get_ids(css: str):
     return list(map(lambda x: x[1:], re_ids.findall(css)))
 
 
 def handle_css(folders, output):
-    css, ids, classes = '', [], []
+    css = read_if_exists('pages/index.css')
+    ids, classes = [], []
 
     for item, folde in zip(filter(lambda x: x != None, map(lambda x: x[3], folders)), folders):
         new_ids = get_ids(item)
@@ -226,7 +234,7 @@ def handle_js(folders, output, fold):
     return js
 
 
-def build_home_map(page, filename):
+def build_home_map(page, filename: str):
     page[0]['init'] = build_js(page[0]['init'], os.path.join(page[6], js_name))
     d = {page[5]: page[0]}
     if page[4] != None:
@@ -235,7 +243,7 @@ def build_home_map(page, filename):
         json.dump(d, f, indent=4)
 
 
-def compile_directory(folders, output, output_home):
+def compile_directory(folders, output: str, output_home: str):
     res = [do_one_page(folder) for folder in folders]
     res.sort(key=lambda x: x[1])  # sorting by order
 
@@ -260,11 +268,27 @@ def compile_directory(folders, output, output_home):
 # add static directory for router and img
 
 
+def build_static(filenames, output):
+    s = ''
+    for filename in filenames:
+        with open(filename, 'r') as f:
+            content = f.read()
+        s += content + '\n'
+    with open(output, 'w') as f:
+        f.write(s)
+
+
 def init_build_directory():
     if os.path.exists('build'):
         shutil.rmtree('build')
     os.mkdir('build')
-    shutil.copy('pages/index.js', 'build/')
+    os.mkdir('build/assets')
+    os.mkdir('build/assets/static')
+    # shutil.copytree('static', os.path.join(build_directory, 'static'))
+    try:
+        shutil.copy('pages/index.js', 'build/assets/')
+    except:
+        print_warn("missing index.js... continuing")
 
 
 string_import_replace = '<!-- |imports here| -->'
@@ -272,7 +296,15 @@ base_import_html = '<script src="{}"></script>'
 
 
 def build_imports(imports):
-    return '\n'.join([base_import_html.format(i) for i in imports])
+    return '\n'.join(base_import_html.format(i) for i in imports)
+
+
+def prepare_router(output_directory):
+    #
+    shutil.copyfile(os.path.join('build_tools', 'router.js'),
+                    os.path.join(output_directory, 'router.js'))
+    shutil.copyfile(os.path.join('build_tools', 'loading.gif'),
+                    os.path.join(output_directory, 'loading.gif'))
 
 
 def build_html(build_path, js):
@@ -281,11 +313,24 @@ def build_html(build_path, js):
     with open('config.json', 'r') as f:
         t = json.load(f)
     imports = t['import']
+    local_imports = [i for i in imports if is_local_static_file(i)]
+
+    for l in local_imports:
+        imports.remove(l)
+    if len(local_imports) > 0:
+        imports.append('assets/static/static.js')
+    prepare_router(os.path.join(build_directory, 'static'))
+    build_static(local_imports, os.path.join(
+        build_directory, 'static', 'static.js'))
     content = content.replace(loader_replace, js)
     content = content.replace(string_import_replace, build_imports(imports))
 
-    with open(os.path.join(build_path, 'index.html'), 'w') as f:
+    with open(os.path.join('/'.join(build_path.split('/')[:-1]), 'index.html'), 'w') as f:
         f.write(content)
+
+
+def is_local_static_file(path):
+    return not ('http' in path or 'https' in path)
 
 
 def main(folderss=[], prefix=''):
@@ -298,15 +343,11 @@ def main(folderss=[], prefix=''):
     else:
         folders = [*folderss]
 
-    build_directory = 'build'
-    map_name = 'map.json'
-    # js_name = 'index.js'
-    map_home = 'home_map.json'
-
     init_build_directory()
 
-    helper.try_rm_list(folders, 'pages/index.js')
-    helper.try_rm_list(folders, 'pages/.DS_Store')
+    to_remove = ['pages/index.js', 'pages/index.css', 'pages/.DS_Store']
+    for i in to_remove:
+        helper.try_rm_list(folders, i)
 
     map_filename = os.path.join(build_directory, map_name)
     map_home_name = os.path.join(build_directory, map_home)
@@ -315,11 +356,12 @@ def main(folderss=[], prefix=''):
         home_page, res = compile_directory(
             folders, map_filename, map_home_name)
         folders = [i[6] for i in res]
-        loader = build_loader(home_page, folders, map_name, map_home)
+        loader = build_loader(home_page, folders, os.path.join(
+            'assets', map_name), os.path.join('assets', map_home))
         build_html(build_directory, loader)
     except Exception as e:
         end_time = time.time()
-        print_error(prefix, ' [Error] :', e.__str__())
+        print_error(prefix, ' [Error]:', e.__str__())
     else:
         end_time = time.time()
         print_success(prefix, ' Successful build | %0.2f s' %

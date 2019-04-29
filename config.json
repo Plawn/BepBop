@@ -1,6 +1,9 @@
 {
-    "last_page": 5,
+    "last_page": 1,
     "import": [
-        "/static/webSocketedCon.js"
+        "static/nginx_ui.js",
+        "static/Fancy_form.js",
+        "static/overlay_prompt.js",
+        "static/basics.js"
     ]
 }
